@@ -1,0 +1,46 @@
+Big Data 
+
+ 
+
+    Four V’s of Big Data: http://www.ibmbigdatahub.com/infographic/four-vs-big-data
+    Big Data (wiki): http://en.wikipedia.org/wiki/Big_data
+    200MS: The Life of a Programmatic RTB Ad Impression: http://bit.ly/1iPqAlt
+    Google MapReduce Paper 2004: http://bit.ly/1ADYtjC
+    Big data: The next frontier for innovation, competition, and productivity: http://bit.ly/1pCOqom
+
+
+
+Use Cases
+
+ 
+
+    Google, Stanford build hybrid neural networks that can explain photos: http://bit.ly/11owuZ2
+    Why Hadoop Is The New Backbone Of American Express : http://www.enterprisetech.com/2014/10/17/hadoop-new-backbone-american-express/
+
+
+
+ 
+
+ 
+
+Analytics Tools Comparison
+
+ 
+
+    Rexer Analytics 2013 Data Miner Survey Highlights: http://bit.ly/1sgb6lE
+    The Popularity of Data Analysis Software 2012 http://r4stats.com/articles/popularity/
+    Indeed.com Job Trends: SAS vs R http://www.indeed.com/jobtrends/R+statistics,+SAS+statistics.html
+
+Big Data Jobs
+
+
+    Big data jobs around the nation: http://www.tableausoftware.com/public/gallery/big-data-jobs
+    Big Data Salary: http://goo.gl/4et998
+    Oreilly Media Data Science Salary Survey: http://www.oreilly.com/data/free/files/stratasurvey.pdf
+    KDNuggets 2014 Analytics/Data Science Salary Poll: http://goo.gl/VhO9IW
+    Big Data Salaries: An Inside Look Data Scientist Salaries, Data Analyst Salaries, DBA Salaries, etc: https://datajobs.com/big-data-salary
+
+Data Science Teams
+
+    How to build a hadoop data scienice team: http://hortonworks.com/blog/hortonworks-hadoop-data-science/
+
