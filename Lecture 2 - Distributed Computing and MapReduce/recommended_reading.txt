@@ -1,0 +1,11 @@
+K-Means
+
+    How to choose K: http://en.wikipedia.org/wiki/Determining_the_number_of_clusters_in_a_data_set
+    Cluster computing and MapReduce: https://www.youtube.com/watch?v=1ZDybXl212Q
+    Data Smart: Using Data Science to Transform Information into Insight (amazon)
+        Chapter 2 talks about cluster analysis and k-means
+
+MapReduce
+
+    Cluster computing and MapReduce: https://www.youtube.com/watch?v=1ZDybXl212Q
+

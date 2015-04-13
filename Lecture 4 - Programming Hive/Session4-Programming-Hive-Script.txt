@@ -1,0 +1,236 @@
+
+
+--------------------------------------
+--------------------------------------
+-- Working with Hive Database
+--------------------------------------
+--------------------------------------
+
+show databases;
+
+create database twitter;
+
+use twitter;
+
+show databases;
+
+describe database extended twitter;
+
+
+--------------------------------------
+--------------------------------------
+-- Working with Hive Tables
+--------------------------------------
+--------------------------------------
+
+
+create table twitter.full_text (                                                   
+          id string, 
+          ts string, 
+          lat_lon string,
+          lat string, 
+          lon string, 
+          tweet string)
+row format delimited 
+fields terminated by '\t' ; 
+
+load data inpath '/user/lab/twitter/'  
+overwrite into table twitter.full_text;
+
+describe twitter.full_text;
+
+describe extended twitter.full_text;
+
+dfs -ls /apps/hive/warehouse;
+
+select id, ts from twitter.full_text limit 5;
+
+create table twitter.full_text_2 as select * from twitter.full_text;
+
+
+
+--------------------------------------
+--------------------------------------
+-- Hive Functions
+--------------------------------------
+--------------------------------------
+
+-----------------
+-- DATE function
+-----------------
+create table vfull_text_ts as
+select id, cast(concat(substr(ts,1,10), ' ', substr(ts,12,8)) as timestamp) as ts, lat, lon, tweet
+from full_text;
+
+describe twitter.full_text_ts;
+
+-- Extract year, month and day from timestamp
+select ts, unix_timestamp(ts) as unix_timestamp, to_date(ts) as date, year(ts) as year, month(ts) as month, day(ts) as day
+from twitter.full_text_ts
+limit 5;
+
+
+
+
+-------------------
+-- STRING function
+-------------------
+select id, ts, trim(lower(tweet)) as tweet
+from twitter.full_text_ts
+limit 5;
+
+select id, ts, trim(upper(tweet)) as tweet
+from twitter.full_text_ts
+limit 5;
+
+select id, ts, length(tweet) as tweet
+from twitter.full_text_ts
+limit 5;
+
+select id, ts, sentences(tweet) as tokens
+from twitter.full_text_ts
+limit 5;
+
+
+
+-- Find twitter handles mentioned in a tweet 
+select id, ts, regexp_extract(lower(tweet), '(.*)@user_(\\S{8})([:| ])(.*)',2) as patterns
+from twitter.full_text_ts
+limit 5;
+
+
+
+-- Finding users who tweet long tweets
+
+select t.id, t.len, t.tweet
+from (select id, tweet, length(tweet) as len from twitter.full_text_ts) t 
+order by len desc
+limit 10;
+
+
+
+select t.id, t.len, t.trimmed_tweet
+from (select id, regexp_replace(tweet, "@USER_\\w{8}", " ") as trimmed_tweet, length(regexp_replace(tweet, "@USER_\\w{8}", " ")) as len from twitter.full_text_ts) t 
+order by len desc
+limit 10;
+
+
+
+------------------------
+-- CONDITIONAL function
+------------------------
+-- Find users who like to tw-eating
+
+select * from
+    (select id, ts, case when hour(ts) = 7 then 'breakfast'
+                        when hour(ts) = 12 then 'lunch'
+                        when hour(ts) = 19 then 'dinner'
+                   end as tw_eating,
+           lat, lon
+    from twitter.full_text_ts) t
+where t.tw_eating in ('breakfast','lunch','dinner')
+limit 10;
+
+
+
+--------------------------------------
+--------------------------------------
+-- WHERE Clause - Filtering Data
+--------------------------------------
+--------------------------------------
+
+-- Find all tweets by a user
+
+select id, ts, lat, lon, tweet
+from twitter.full_text_ts   
+where id='USER_ae406f1d'; 
+
+
+-- Calculate # of tweets on a specific date
+
+select *
+from twitter.full_text_ts
+where to_date(ts) = '2010-03-07'
+limit 5; 
+
+select count(*)
+from twitter.full_text_ts
+where to_date(ts) = '2010-03-07'
+
+-- Find all tweets tweeted from NYC vicinity (using bounding box -74.2589, 40.4774, -73.7004, 40.9176)
+
+select distinct lat, lon 
+from twitter.full_text_ts
+where lat > 40.4774 and lat < 40.9176 and
+      lon > -74.2589 and lon < -73.7004
+limit 20;
+
+
+--------------------------------------
+--------------------------------------
+-- GROUP BY - Aggregation
+--------------------------------------
+--------------------------------------
+
+-- Calculate # of tweets per user
+
+create table twitter.tweets_per_user as
+select id, COUNT(*) as cnt
+from twitter.full_text_ts
+group by id;
+
+
+--------------------------------------
+--------------------------------------
+-- ORDER BY
+--------------------------------------
+--------------------------------------
+
+-- Find top 10 tweeters in NYC
+select id, count(*) as cnt
+from twitter.full_text_ts
+where lat > 40.4774 and lat < 40.9176 and
+      lon > -74.2589 and lon < -73.7004
+group by id
+order by cnt desc
+limit 15;
+
+--------------------------------------
+--------------------------------------
+-- DISTINCT 
+--------------------------------------
+--------------------------------------
+
+-- Find # of days this dataset cover
+
+select count(distinct to_date(ts))
+from twitter.full_text_ts;
+
+
+--------------------------------------
+--------------------------------------
+-- JOIN
+--------------------------------------
+--------------------------------------
+
+-- prepare lookup table 'dayofweek'
+
+create table twitter.dayofweek (date string, dayofweek string)
+row format delimited
+fields terminated by '\t';
+
+load data inpath '/user/lab/dayofweek.txt'
+overwrite into table twitter.dayofweek;
+
+-- Find Weekend Tweets
+-- INNER JOIN
+
+create table twitter.weekend_tweets as
+select a.id, a.ts, b.dayofweek, a.lat, a.lon, a.tweet
+from twitter.full_text_ts a JOIN twitter.dayofweek b
+     ON to_date(a.ts) = b.date AND b.dayofweek IN ('Saturday','Sunday');
+
+
+
+
+

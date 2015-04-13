@@ -1,0 +1,558 @@
+
+
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+-- Lab Data Preparation
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+
+
+-- Run the following shell commands to make sure that you have full_text.txt under /user/lab/pig folder in HDFS
+
+[root@sandbox ~]# hadoop fs -mkdir /user/lab/pig
+[root@sandbox ~]# cd /home/lab
+[root@sandbox lab]# ll
+[root@sandbox lab]# cd GeoText.2010-10-12
+[root@sandbox GeoText.2010-10-12]# hadoop fs -put full_text.txt /user/lab/pig/
+[root@sandbox GeoText.2010-10-12]# hadoop fs -cat /user/lab/pig/full_text.txt | head 
+
+
+-- Create two pig scripts that we will use later for invocation of the script from pig grunt
+
+[root@sandbox GeoText.2010-10-12]# echo -e "set job.name 'pig_test' \n a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray); \n b = limit a 5; \n dump b;" > /home/lab/test1.pig
+
+[root@sandbox GeoText.2010-10-12]# cat test1.pig
+
+[root@sandbox GeoText.2010-10-12]# echo -e "set job.name 'pig_test' \n a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray); \n b = limit a 5; \n store b into '/user/lab/pig/full_text_limit3';" > /home/lab/test2.pig
+
+[root@sandbox GeoText.2010-10-12]# cat test2.pig
+
+
+
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+-- Pig Shell/Utility Commands
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+
+-- Launch pig grunt shell (interactive mode)
+
+[root@sandbox GeoText.2010-10-12]#  pig
+
+
+
+-- Execute a pig script
+[root@sandbox GeoText.2010-10-12]#  pig test1.pig
+
+
+---------------------------------------------
+-- Shell commands (running from Pig grunt)
+---------------------------------------------
+
+[root@sandbox GeoText.2010-10-12]#  pig
+
+-- run shell command in pig grunt
+sh pwd
+sh ls -alF /home/lab/GeoText.2010-10-12
+
+
+----------------------------------------------
+-- FsShell commands (working with HDFS files)
+----------------------------------------------
+
+-- run HDFS commands in pig grunt
+fs -ls /user
+fs -ls /user/lab/pig
+fs -put /home/lab/GeoText.2010-10-12/full_text.txt /user/lab/pig/full_text_1.txt
+
+-------------------
+-- Utility commands
+-------------------
+
+-- execute a pig script from pig grunt (parameters/relations in the script are NOT passed to the current grunt environment)
+exec test1.pig
+
+-- run a pig script from pig grunt (parameters are passed to the current grunt environment)
+run test2.pig
+
+-- list a directory in pig grunt
+fs -ls /user/lab/pig
+
+-- remove a file/directory in pig grunt
+rmf /user/lab/pig/full_text_limit3
+
+
+-- set pig job properties in pig grunt/script
+set job.name 'testing'
+set default_parallel 10
+set job.priority high
+
+
+-- clear screen
+clear
+
+-- quit pig grunt and return to linux
+quit
+
+
+
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+-- Pig Latin Basics
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+
+-- Data exploration using dump
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = limit a 5;
+dump b;
+
+-- load and store data
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+rmf /user/lab/pig/full_text_1.txt
+c = store b into '/user/lab/pig/full_text_1.txt';
+
+-- Working with relations
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = a;
+c = limit b 5;
+dump c;
+
+
+-- Referencing fields (using position and field names)
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate $0, $1, location, tweet;
+c = limit b 5;
+dump c;
+
+describe b;
+
+
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+-- Complex Data Types
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+
+-- map example 2
+
+quit
+
+[root@sandbox ~]# echo -e "user1\t{([address#2436 mains st]),([name#shaohua]),([phone#222-222-2222]),([city#toronto])} \nuser2\t{([address#456 king st]),([name#jenny]),([occupation#doctor]),([city#toronto])}\nuser3\t{([city#mississauga]),([name#larry]),([interest#sports])}" > data_test_map
+
+[root@sandbox ~]# pig
+
+a = load '/user/lab/pig/data_test_map' using PigStorage('\t') as (id:chararray, info:bag{t:(m:map[])});
+b = foreach a generate id, info, flatten(info);
+c = filter b by m#'city'=='toronto';
+dump c;
+
+
+-- map example 2
+-- data prep
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, ts, TOTUPLE(lat, lon) as loc_tuple:tuple(lat:chararray, lon:chararray), flatten(TOKENIZE(tweet)) as token;
+c = group b by (id, token);
+d = foreach c generate flatten(group) as (id, token), COUNT(b) as cnt; 
+e = group d by id;
+f = foreach e generate group as id, flatten(TOP(10, 2, d)) as (id1, word,cnt);
+g = foreach f generate id, TOMAP(word, cnt) as freq_word:map[];
+h = group g by id;
+store h into '/user/lab/pig/full_text_t_map';
+
+a = load '/user/lab/pig/full_text_t_map';       
+b = limit a 3;
+dump b;
+
+-- load map type and get top 5 frequent words of a tweeter
+a = load '/user/lab/pig/full_text_t_map' as (id:chararray, freq_word:bag{t:(id1:chararray, freq_word_m:map[])});
+b = foreach a generate id, flatten(freq_word) as (id1, freq_word_m);
+c = filter b by (int)freq_word_m#'I' > 5;
+d = limit c 10;
+dump d;
+
+
+-- bag example (star expression)
+quit
+
+[root@sandbox ~]# echo -e "user1\ta\tb\tc\nuser2\ta\tb\nuser3\ta" > data_test_map
+[root@sandbox ~]# cat data_test_map
+[root@sandbox ~]# hadoop fs -rmr /user/lab/pig/data_test_map
+[root@sandbox ~]# hadoop fs -put data_test_map /user/lab/pig/data_test_map
+
+
+
+a = load '/user/lab/pig/data_test_map' using PigStorage('\t') as (id:chararray, f1:chararray, f2:chararray, f3:chararray);
+b = group a ALL;
+c = foreach b generate COUNT(a.$0);
+d = foreach b generate COUNT(a.$1);
+e = foreach b generate COUNT(a.$2);
+f = foreach b generate COUNT(a.$3);
+g = foreach b generate COUNT(a);
+h = foreach b generate COUNT(a.*);   -- error
+dump c;  -- 3
+dump d;  -- 3
+dump e;  -- 2
+dump f;  -- 1
+dump g;  -- 3
+
+
+
+
+
+
+
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+-- Pig Functions
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+
+-------------------------
+-- DATE/Time functions
+
+-- CurrentTime()
+-- GetYear()
+-- GetMonth()
+-- GetDay()
+-- GetWeek()
+-- ToDate()
+-- ToString()
+-- ToUnixTime()
+-------------------------
+
+-- Date/Time functions
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, ts, ToDate(ts) as ts1;
+c = foreach b generate id, ts, ts1, ToString(ts1) as ts_iso, ToUnixTime(ts1), GetYear(ts1) as year, GetMonth(ts1) as month, GetWeek(ts1) as week;
+d = limit c 5;
+dump d;
+
+
+
+
+--------------------------
+-- STRING functions
+
+-- LOWER()
+-- UPPER()
+-- STARTSWITH()
+-- ENDSWITCH()
+-- STRSPLIT()
+-- STRSPLITTOBAG()
+-- REPLACE()
+-- SUBSTRING()
+-- TRIM()
+-- INDEXOF()
+-- LASTINDEXOF()
+-- REGEX_EXTRACT_ALL()
+-- REGEX_EXTRACT()
+--------------------------
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, ts, location, LOWER(tweet) as tweet;
+c = limit b 5;
+dump c;
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, ts, location, UPPER(tweet) as tweet;
+c = limit b 5;
+dump c;
+
+-- Use SUBSTRING() to extract year from ts string
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, ts, SUBSTRING(ts, 0,4);
+c = limit b 5;
+dump c;
+
+-- Use STARTSWITH() to get retweets 
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = filter a by STARTSWITH(tweet,'RT');
+c = group b all;
+d = foreach c generate COUNT(b);
+dump d;
+
+
+-- Find first twitter handles mentioned in a tweet using regex_extract() function
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, ts, location, LOWER(tweet) as tweet;
+c = foreach b generate id, ts, location, REGEX_EXTRACT(tweet, '(.*)@user_(\\S{8})([:| ])(.*)',2) as tweet;
+d = limit c 5;
+dump d;
+
+-- Find first 3 twitter handles mentioned in a tweet using regex_extract() function
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, ts, location, LOWER(tweet) as tweet;
+c = foreach b generate id, ts, location, REGEX_EXTRACT_ALL(tweet, '.*@user_(\\S{8}).*@user_(\\S{8}).*@user_(\\S{8}).*@user_(\\S{8}).*') as tweet;
+d = filter c by SIZE(tweet)>2;
+e = limit d 5;
+dump e;
+
+
+-- Finding users who tweet long tweets
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, ts, location, SIZE(tweet) as tweet_len;
+c = order b by tweet_len desc;
+d = limit c 10;
+dump d;
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, ts, location, SIZE(REPLACE(tweet, '@USER_\\w{8}', '') ) as tweet_len;
+c = order b by tweet_len desc;
+d = limit c 10;
+dump d;
+
+
+-- STRSPLIT(), STRSPLITTOBAG()
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, FLATTEN(STRSPLITTOBAG(tweet, ' ', 0));
+c = limit b 3;
+dump c;
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, STRSPLITTOBAG(tweet, '[ ",()*]', 0);
+c = limit b 3;
+dump c;
+
+
+-- Tweet word count using TOKENIZE(), FLATTEN()
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate FLATTEN(TOKENIZE(tweet)) as token;
+c = group b by token;
+d = foreach c generate group as token, COUNT(b) as cnt;
+e = order d by cnt desc;
+f = limit e 20;
+dump f;
+
+
+
+--------------------------------------------------------------
+-- CONDITIONAL function
+--------------------------------------------------------------
+-- Find users who like to tw-eating
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, ts, (GetHour(ToDate(ts))==7 ? 'breakfast' : 
+                                   (GetHour(ToDate(ts))==12 ? 'lunch' :
+                                       (GetHour(ToDate(ts))==19 ? 'dinner' : null))) as tw_eating, lat, lon;
+c = filter b by tw_eating=='breakfast' or tw_eating=='lunch' or tw_eating=='dinner';
+d = limit c 50;
+dump d;
+
+
+
+
+
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+-- Pig Relational Operations
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+
+-- Find all tweets by a user
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = filter a by id=='USER_ae406f1d'; 
+dump b;
+
+
+-- Find all tweets tweeted from NYC vicinity (using bounding box -74.2589, 40.4774, -73.7004, 40.9176)
+-- http://www.darrinward.com/lat-long/?id=461435
+
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = filter a by lat > 40.4774 and lat < 40.9176 and lon > -74.2589 and lon < -73.7004 and 
+                SIZE(tweet)<50 and 
+                GetHour(ToDate(ts))==12;
+c = foreach b generate lat, lon;
+d = distinct c;
+e = limit d 500;
+dump e;
+
+
+-- Filtering data in pig
+-- find retweets in NYC on 12th with length smaller than 50 characters
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = filter a by lat > 40.4774 and lat < 40.9176 and lon > -74.2589 and lon < -73.7004 and 
+                SIZE(tweet)<50 and 
+                GetHour(ToDate(ts))==12;
+c = foreach b generate id, ts, lat, lon, tweet;
+d = limit c 10;
+dump d;
+
+---------------------------
+-- GROUP BY - Aggregation
+---------------------------
+
+
+-- Calculate # of tweets per user 
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = group a by id;
+c = foreach b generate group as id, COUNT(a) as cnt;
+d = order c by cnt desc;
+e = limit d 5;
+dump e;
+
+-- Count total number of records
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = group a ALL;
+c = foreach b generate COUNT_STAR(b);
+dump c;
+
+
+--------------
+-- COGROUP ---
+--------------
+[root@sandbox ~]# echo -e "u1,14,M,US\nu2,32,F,UK\nu3,22,M,US" > /home/lab/user.txt
+[root@sandbox ~]# hadoop fs -put /home/lab/user.txt /user/lab/pig/user.txt
+
+-- u1, 14, M, US
+-- u2, 32, F, UK
+-- u3, 22, M, US
+
+[root@sandbox ~]# echo -e "u1,US\nu1,UK\nu1,CA\nu2,US" > /home/lab/session.txt
+[root@sandbox ~]# hadoop fs -put /home/lab/session.txt /user/lab/pig/session.txt
+
+-- u1, US
+-- u1, UK
+-- u1, CA
+-- u2, US
+
+user = load '/user/lab/pig/user.txt' using PigStorage(',') as (uid:chararray, age:int, gender:chararray, region:chararray);
+session = load '/user/lab/pig/session.txt' using PigStorage(',') as (uid:chararray, region:chararray);
+C = cogroup user by uid, session by uid;
+D = foreach C {
+    crossed = cross user, session;
+    generate crossed;
+}
+dump D;  
+
+--------------------------------------
+-- ORDER BY
+--------------------------------------
+
+-- Find top 10 tweeters in NYC
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = filter a by lat > 40.4774 and lat < 40.9176 and
+      lon > -74.2589 and lon < -73.7004;
+c = group b by id;
+d = foreach c generate group as id, COUNT(b) as cnt;
+e = order d by cnt desc;
+f = limit e 10;
+dump f;
+
+
+
+
+--------------------------------------
+-- JOIN
+--------------------------------------
+
+
+-- prepare lookup table 'dayofweek'
+
+fs -put /home/lab/dayofweek.txt /user/lab/pig/
+
+
+-- Find Weekend Tweets
+-- INNER JOIN
+
+a = load '/user/lab/pig/full_text.txt' using PigStorage('\t') AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+a1 = foreach a generate id, ts, SUBSTRING(ts,0,10) as date;
+
+b = load '/user/lab/pig/dayofweek.txt' using PigStorage('\t') as (date:chararray, dow:chararray);
+b1 = filter b by dow=='Saturday' or dow=='Sunday';
+
+c = join a1 by date, b1 by date;
+d = foreach c generate a1::id .. a1::date, b1::dow as dow;
+e = limit d 5;
+dump e;
+
+---------------------
+-- Flatten
+---------------------
+
+-- Flatten Tuples
+-- Calculate # of tweets per user per day
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, SUBSTRING(ts, 0, 10) as date, lat, lon, tweet;
+c = GROUP b BY (id, date);
+d = FOREACH c GENERATE FLATTEN(group) AS (id,date) , COUNT(b) as cnt;
+e = order d by cnt desc;
+f = limit e 5;
+dump f;
+
+-- visualize group
+illustrate d;
+
+
+
+-- Flatten Bags
+-- Flatten Bags Example
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, SUBSTRING(ts, 0, 10) as date, lat, lon, tweet;
+c = GROUP b BY (id, date);
+d = FOREACH c GENERATE FLATTEN(b) AS (id, date, lat, lon, tweet);
+e = order d by id, date;
+f = limit e 50;
+dump f;
+
+
+
+--------------------------------------
+-- Nested Foreach
+--------------------------------------
+
+
+-- Get top word of each user and store in bags
+
+-- method 1
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, ts, TOTUPLE(lat, lon) as loc_tuple:tuple(lat:chararray, lon:chararray), flatten(TOKENIZE(tweet)) as token;
+c = group b by (id, token);
+d = foreach c generate flatten(group) as (id, token), COUNT(b) as cnt; 
+e = group d by id;
+f = foreach e {
+	sortd = order d by cnt desc;
+	top = limit sortd 10;
+	generate group as id, top as pop_word_bag;
+};
+g = limit f 10;
+dump g;
+
+
+-- method 2
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, ts, TOTUPLE(lat, lon) as loc_tuple:tuple(lat:chararray, lon:chararray), flatten(TOKENIZE(tweet)) as token;
+c = group b by (id, token);
+d = foreach c generate flatten(group) as (id, token), COUNT(b) as cnt; 
+e = group d by id;
+f = foreach e generate group as id, TOP(10, 2, d);
+g = limit f 10;
+dump g;
+
+
+
+--
+
+[root@sandbox ~]# echo -e "www.ccc.com,www.hjk.com\nwww.ddd.com,www.xyz.org\nwww.aaa.com,www.cvn.org\nwww.www.com,www.kpt.net\nwww.www.com,www.xyz.org\nwww.ddd.com,www.xyz.org" > /home/lab/url.txt
+[root@sandbox ~]# hadoop fs -put url.txt /user/lab/pig/
+
+A = LOAD '/user/lab/pig/url.txt' using PigStorage(',') AS (url:chararray,outlink:chararray);
+B = GROUP A BY url;
+X = FOREACH B {
+        FA= FILTER A BY outlink == 'www.xyz.org';
+        PA = FA.outlink;
+        DA = DISTINCT PA;
+        GENERATE group, COUNT(DA);
+}
+dump X;	

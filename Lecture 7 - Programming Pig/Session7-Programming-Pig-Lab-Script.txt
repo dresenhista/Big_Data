@@ -1,0 +1,157 @@
+
+
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+-- Lab Data Preparation
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+
+
+-- Run the following shell commands to make sure that you have full_text.txt under /user/lab/pig folder in HDFS
+
+[root@sandbox ~]# hadoop fs -mkdir /user/lab/pig
+[root@sandbox ~]# cd /home/lab
+[root@sandbox lab]# ll
+[root@sandbox lab]# cd GeoText.2010-10-12
+[root@sandbox GeoText.2010-10-12]# hadoop fs -put full_text.txt /user/lab/pig/
+[root@sandbox GeoText.2010-10-12]# hadoop fs -cat /user/lab/pig/full_text.txt | head 
+
+
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+-- Pig Shell/Utility Commands
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+
+-- Launch pig grunt shell (interactive mode)
+
+[root@sandbox GeoText.2010-10-12]#  pig
+
+
+---------------------------------------------
+-- Shell commands (running from Pig grunt)
+---------------------------------------------
+
+[root@sandbox GeoText.2010-10-12]#  pig
+
+-- run shell command in pig grunt
+sh pwd
+sh ls -alF /home/lab/GeoText.2010-10-12
+
+
+----------------------------------------------
+-- FsShell commands (working with HDFS files)
+----------------------------------------------
+
+-- run HDFS commands in pig grunt
+fs -ls /user
+fs -ls /user/lab/pig
+fs -put /home/lab/GeoText.2010-10-12/full_text.txt /user/lab/pig/full_text_1.txt
+
+-------------------
+-- Utility commands
+-------------------
+
+-- list a directory in pig grunt
+fs -ls /user/lab/pig
+
+-- remove a file/directory in pig grunt
+rmf /user/lab/pig/full_text_1.txt
+
+-- clear screen
+clear
+
+-- quit pig grunt and return to linux
+quit
+
+
+
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+-- Pig Latin Basics
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+
+-- Data exploration using dump
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = limit a 5;
+dump b;
+
+-- load and store data
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+rmf /user/lab/pig/full_text_1.txt
+c = store b into '/user/lab/pig/full_text_1.txt';
+
+-- Working with relations
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = a;
+c = limit b 5;
+dump c;
+
+
+-- Referencing fields (using position and field names)
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate $0, $1, location, tweet;
+c = limit b 5;
+dump c;
+
+describe b;
+
+
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+-- Pig Functions
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+
+-------------------------
+-- DATE/Time functions
+-------------------------
+
+-- Date/Time functions
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, ts, ToDate(ts) as ts1;
+c = foreach b generate id, ts, ts1, ToString(ts1) as ts_iso, ToUnixTime(ts1), GetYear(ts1) as year, GetMonth(ts1) as month, GetWeek(ts1) as week;
+d = limit c 5;
+dump d;
+
+-------------------------
+-- String functions
+-------------------------
+
+-- Use SUBSTRING() to extract year from ts string
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, ts, SUBSTRING(ts, 0,4);
+c = limit b 5;
+dump c;
+
+-- Find first twitter handles mentioned in a tweet using regex_extract() function
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, ts, location, LOWER(tweet) as tweet;
+c = foreach b generate id, ts, location, REGEX_EXTRACT(tweet, '(.*)@user_(\\S{8})([:| ])(.*)',2) as tweet;
+d = limit c 5;
+dump d;
+
+-- Finding users who tweet long tweets
+
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate id, ts, location, SIZE(REPLACE(tweet, '@USER_\\w{8}', '') ) as tweet_len;
+c = order b by tweet_len desc;
+d = limit c 10;
+dump d;
+
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+-- Pig Word Count
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+-- Tweet word count using TOKENIZE(), FLATTEN()
+a = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate FLATTEN(TOKENIZE(tweet)) as token;
+c = group b by token;
+d = foreach c generate group as token, COUNT(b) as cnt;
+e = order d by cnt desc;
+f = limit e 20;
+dump f;

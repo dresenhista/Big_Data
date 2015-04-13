@@ -1,0 +1,37 @@
+register /home/lab/pigeon-1.0-SNAPSHOT.jar;
+register /home/lab/esri-geometry-api-1.2.jar;
+
+-- define functions
+DEFINE ST_Contains edu.umn.cs.pigeon.Contains;
+DEFINE ST_MakePoint edu.umn.cs.pigeon.MakePoint;
+DEFINE ST_MakePolygon edu.umn.cs.pigeon.MakePolygon;
+
+-- load full_text data
+data = load '/user/lab/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:double, lon:double, tweet:chararray);
+
+-- make geometry point
+data1 = FOREACH data GENERATE id, ts, lat, lon, ST_MakePoint(lat, lon) AS geom_point, tweet;
+
+-- load US state polygon data
+state_polygon = load '/user/lab/pig/US_state_boundary.txt' as (state:chararray, seq:int, lat:double, lon:double);
+
+-- make geometry points
+state_polygon_geom_point = FOREACH state_polygon GENERATE state, seq, ST_MakePoint(lat, lon) as state_polygon_geom_point;
+state_polygon_geom_point_sort = order state_polygon_geom_point by state, seq;
+grp = GROUP state_polygon_geom_point_sort by state;
+
+-- make geometry polygon
+state_polygon_geom = FOREACH grp GENERATE group as state, ST_MakePolygon(state_polygon_geom_point_sort.state_polygon_geom_point) as geom_polygon;
+
+-- cross join lat-lon geometry points with state geometry polygon 
+polygon_cross = cross data1, state_polygon_geom;
+
+-- filter results by point-in-polygon
+results = FILTER polygon_cross BY ST_Contains(state_polygon_geom::geom_polygon, data1::geom_point);
+results_text = FOREACH results GENERATE data1::id, data1::ts, data1::lat, data1::lon, data1::tweet, state_polygon_geom::state;
+
+-- store data
+rmf /user/lab/pig/full_text_state
+STORE results_text INTO '/user/lab/pig/full_text_state';  
+
+
