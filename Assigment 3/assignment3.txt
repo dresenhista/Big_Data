@@ -1,0 +1,22 @@
+#Using the dataset Twitter Geo-tagged Tweets (full_text.txt)   
+#(Question 1) Find first 3 twitter handles mentioned in a tweet using regex_extract() function
+
+
+load_file = load '/user/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+lower_letter = foreach load_file generate id, ts, location, LOWER(tweet) as tweet;
+find_expression = foreach lower_letter generate id, REGEX_EXTRACT_ALL(tweet, '.*@user_(\\S{8}).*@user_(\\S{8}).*@user_(\\S{8}).*@user_(\\S{8}).*') as tweet;
+filter_query = filter find_expression by SIZE(tweet)>2;
+e = limit filter_query 5;
+dump e;
+
+
+#######################################################
+#(Question 2) Find 3 most popular topics (hashtags)
+a = load '/user/pig/full_text.txt' AS (id:chararray, ts:chararray, location:chararray, lat:float, lon:float, tweet:chararray);
+b = foreach a generate FLATTEN(TOKENIZE(tweet)) as token;
+c = group b by token;
+d = foreach c generate group as token, COUNT(b) as cnt;
+e = order d by cnt desc;
+f = filter e by token matches '#.*';
+g = limit f 3;
+dump f;
