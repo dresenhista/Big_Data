@@ -1,0 +1,101 @@
+
+
+#Find hour of the day that generated most number of tweets on March 6, 2010
+
+create table twitter.full_text (                                                   
+id string, 
+ts string, 
+lat_lon string,
+lat string, 
+lon string, 
+tweet string)
+row format delimited 
+fields terminated by '\t' ; 
+
+load data inpath '/user/lab/twitter/'  
+overwrite into table full_text
+
+
+select
+hour(cast(concat(substr(ts,1,10), ' ', substr(ts,12,8)) as timestamp)) as ts, 
+count(tweet) as tweets_count
+from twitter.full_text
+
+where to_date(substr(ts,1,10))= '2010-03-06' 
+
+group by ts order by tweets_count desc limit 1;
+
+
+
+select
+ts as ts, 
+count(tweet) as tweets_count
+from twitter.full_text
+
+where to_date(substr(ts,1,10))= '2010-03-06' 
+
+group by ts order by tweets_count desc limit 1;
+
+
+
+create table tweet_words as select explode(split(tweet, ' ')) from full_text; 
+
+select col from tweet_words where col REGEXP '^#' limit 50; 
+
+#########################################
+#Find 3 most popular topics (hashtags #)
+
+create table topics as 
+select word from
+(select explode(split(tweet, ' '))  as word from full_text) as temp
+where word REGEXP '^#' 
+
+;
+
+
+########################################
+#Find the most mobile tweeter
+  #User who tweeted from most distinct location (lat-lon)
+
+
+select word, count(*) as num_mention from topics group by word order by num_mention desc limit 3;
+  2 * asin(
+    sqrt(
+      cos(radians(lat1)) *
+      cos(radians(lat2)) *
+      pow(sin(radians((lon1 - lon2)/2)), 2)
+          +
+      pow(radians(sin((lat1 - lat2)/2)), 2)
+
+    )
+  ) * 6371 distance_km
+
+
+select table1.user, 
+  2 * asin(
+    sqrt(
+      cos(radians(lat1)) *
+      cos(radians(lat2)) *
+      pow(sin(radians((lon1 - lon2)/2)), 2)
+          +
+      pow(radians(sin((lat1 - lat2)/2)), 2)
+
+    )
+  ) * 6371 distance_km
+
+from (select id as user, lat as lat1, lon as lon1 from full_text group by id, lat, lon) as table1
+join (select id, lat as lat2, lon2 from full_text group by id, lat, lon) as locations on table1.user = locations.id 
+
+group by table1.user;
+
+select table1.id, table1.lat from full_text table1
+
+create table mentioned_users as 
+select word as user from
+(select explode(split(tweet, ' '))  as word from full_text) as temp
+where word REGEXP '^@USER' ;
+
+
+##################################################    
+#Find most frequently mentioned twitter handle @
+select user, count(user) as count_mentiones from mentioned_users group by user order by count_mentiones desc
